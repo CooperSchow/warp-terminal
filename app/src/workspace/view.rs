@@ -21488,6 +21488,14 @@ impl Workspace {
             );
         }
 
+        if let Some(codex_usage_pill) = self.render_codex_usage_pill(appearance, ctx) {
+            target.add_child(
+                Container::new(codex_usage_pill)
+                    .with_margin_left(TAB_BAR_PADDING_LEFT)
+                    .finish(),
+            );
+        }
+
         let is_online = NetworkStatus::as_ref(ctx).is_online();
 
         if !is_online {
@@ -22288,6 +22296,7 @@ impl Workspace {
     /// visibility to whether data had arrived made it blink in and out on its
     /// own as polls succeeded and failed, with no pattern a user could read.
     /// Gated by `FeatureFlag::ClaudeUsage`.
+    /// The Claude subscription usage pill.
     fn render_usage_pill(
         &self,
         appearance: &Appearance,
@@ -22308,19 +22317,94 @@ impl Workspace {
         let muted = usage.is_none() || model.is_stale();
 
         let (label, tooltip_text) = match usage {
-            Some(usage) => {
-                let detail = usage.tooltip_text();
-                let detail = if muted {
-                    format!("{detail}\n\nRefresh is failing; these figures may be out of date.")
-                } else {
-                    detail
-                };
-                (usage.pill_label(), detail)
-            }
+            Some(usage) => (usage.pill_label(), usage.tooltip_text()),
             None => (
                 crate::claude_usage::PLACEHOLDER_LABEL.to_string(),
                 "Claude usage\nWaiting for the first reading.".to_string(),
             ),
+        };
+
+        Some(self.render_agent_usage_pill(
+            AgentUsagePill {
+                icon: Icon::ClaudeLogo,
+                label,
+                tooltip_text,
+                severity: usage.map(|usage| usage.severity),
+                muted,
+            },
+            self.mouse_states.usage_pill.clone(),
+            appearance,
+        ))
+    }
+
+    /// The Codex subscription usage pill.
+    ///
+    /// A pill of its own rather than a second half of the Claude one, so each
+    /// provider carries its own severity colour — a Codex account against its
+    /// limit shouldn't make the Claude figures look alarming — and so a
+    /// provider that isn't installed or is switched off simply doesn't draw,
+    /// instead of leaving a gap inside a shared pill.
+    fn render_codex_usage_pill(
+        &self,
+        appearance: &Appearance,
+        ctx: &AppContext,
+    ) -> Option<Box<dyn Element>> {
+        if !ctx.has_singleton_model::<crate::settings::CodexSettings>()
+            || !ctx.has_singleton_model::<crate::codex_usage::CodexUsageModel>()
+            || !crate::settings::CodexSettings::as_ref(ctx).is_codex_usage_pill_enabled()
+        {
+            return None;
+        }
+
+        let model = crate::codex_usage::CodexUsageModel::as_ref(ctx);
+        let usage = model.usage();
+        let muted = usage.is_none() || model.is_stale();
+
+        let (label, tooltip_text) = match usage {
+            Some(usage) => (usage.pill_label(), usage.tooltip_text()),
+            None => (
+                crate::codex_usage::PLACEHOLDER_LABEL.to_string(),
+                "Codex usage\nWaiting for the first reading.".to_string(),
+            ),
+        };
+
+        Some(self.render_agent_usage_pill(
+            AgentUsagePill {
+                icon: Icon::OpenAILogo,
+                label,
+                tooltip_text,
+                severity: usage.map(|usage| usage.severity),
+                muted,
+            },
+            self.mouse_states.codex_usage_pill.clone(),
+            appearance,
+        ))
+    }
+
+    /// Draws one provider's usage pill: its logo, its figures, and a hover
+    /// tooltip, in a rounded outline coloured by how close the provider is to
+    /// its limit.
+    ///
+    /// Shared by both providers so the two can't drift into disagreeing about
+    /// what a given percentage should look like.
+    fn render_agent_usage_pill(
+        &self,
+        pill: AgentUsagePill,
+        mouse_state: MouseStateHandle,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let AgentUsagePill {
+            icon,
+            label,
+            tooltip_text,
+            severity,
+            muted,
+        } = pill;
+
+        let tooltip_text = if muted {
+            format!("{tooltip_text}\n\nRefresh is failing; these figures may be out of date.")
+        } else {
+            tooltip_text
         };
 
         // Stay neutral (matching the tab-bar text) when comfortably under a limit;
@@ -22334,21 +22418,33 @@ impl Workspace {
                     .foreground()
                     .with_opacity(MUTED_PILL_OPACITY);
             }
-            match usage.map(|usage| usage.severity) {
-                Some(crate::claude_usage::UsageSeverity::Critical) => Fill::error(),
-                Some(crate::claude_usage::UsageSeverity::Warning) => Fill::warn(),
-                _ => appearance.theme().foreground(),
+            match severity {
+                Some(crate::agent_usage::UsageSeverity::Critical) => Fill::error(),
+                Some(crate::agent_usage::UsageSeverity::Warning) => Fill::warn(),
+                Some(crate::agent_usage::UsageSeverity::Normal) | None => {
+                    appearance.theme().foreground()
+                }
             }
         };
 
+        // The logo is tinted with the same colour as the figures. Both provider
+        // logos are authored white-on-red (warpui's icon shader reads an SVG's
+        // red channel as alpha), so they tint cleanly rather than vanishing.
+        let logo = ConstrainedBox::new(Align::new(icon.to_warpui_icon(color()).finish()).finish())
+            .with_width(PILL_FONT_SIZE)
+            .with_height(PILL_FONT_SIZE)
+            .finish();
+
         let pill = Container::new(
             Flex::row()
+                .with_child(Container::new(logo).with_margin_right(5.).finish())
                 .with_child(
                     Text::new_inline(label, appearance.ui_font_family(), PILL_FONT_SIZE)
                         .with_color(color().into())
                         .finish(),
                 )
                 .with_main_axis_size(MainAxisSize::Min)
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .finish(),
         )
         .with_border(Border::all(1.).with_border_color(color().into()))
@@ -22359,7 +22455,7 @@ impl Workspace {
         .finish();
 
         let ui_builder = appearance.ui_builder().clone();
-        let hoverable = Hoverable::new(self.mouse_states.usage_pill.clone(), |state| {
+        let hoverable = Hoverable::new(mouse_state, |state| {
             let mut stack = Stack::new().with_child(pill);
             if state.is_hovered() {
                 let tool_tip = ui_builder.tool_tip(tooltip_text);
@@ -22376,7 +22472,7 @@ impl Workspace {
             stack.finish()
         });
 
-        Some(Align::new(hoverable.finish()).finish())
+        Align::new(hoverable.finish()).finish()
     }
 
     fn render_banner_and_active_tab(
@@ -25778,7 +25874,7 @@ impl TypedActionView for Workspace {
                     ctx,
                 );
             }
-            OpenClaudeSessionTab {
+            OpenAgentSessionTab {
                 cwd,
                 resume_command,
             } => {
@@ -29968,4 +30064,19 @@ fn set_opencode_warp_plugin(new_entry: &str) -> String {
         },
         Err(e) => format!("Failed to serialize opencode.json: {e}"),
     }
+}
+
+/// One provider's usage reading, ready to draw as a tab-bar pill.
+///
+/// A struct rather than a parameter list because both providers assemble the
+/// same five things, and naming them at each call site is what keeps the logo
+/// and the figures from being paired with the wrong provider's severity.
+struct AgentUsagePill {
+    icon: Icon,
+    label: String,
+    tooltip_text: String,
+    /// `None` before the first reading lands, which draws as muted.
+    severity: Option<crate::agent_usage::UsageSeverity>,
+    /// True when the reading is absent, or too old to vouch for.
+    muted: bool,
 }

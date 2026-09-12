@@ -15,6 +15,7 @@ use serde_json::Value;
 use warpui::r#async::Timer;
 use warpui::{Entity, ModelContext, SingletonEntity};
 
+use crate::agent_usage::{age, UsageSeverity};
 use crate::channel::{Channel, ChannelState};
 
 const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
@@ -46,44 +47,6 @@ const MAX_DISPLAY_AGE: Duration = Duration::from_secs(2 * 60 * 60);
 /// Cache file holding the last reading, so a relaunch shows real figures
 /// immediately instead of waiting on a poll that may be rate-limited.
 const CACHE_FILE: &str = "claude_usage_cache.json";
-
-/// How close to a limit we are, for coloring the pill.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UsageSeverity {
-    #[default]
-    Normal,
-    Warning,
-    Critical,
-}
-
-impl UsageSeverity {
-    fn from_api(s: &str) -> UsageSeverity {
-        match s {
-            "warning" => UsageSeverity::Warning,
-            "critical" | "blocked" | "exceeded" => UsageSeverity::Critical,
-            _ => UsageSeverity::Normal,
-        }
-    }
-
-    /// Fallback when the API doesn't tag a severity: derive from the percentage.
-    fn from_pct(pct: f32) -> UsageSeverity {
-        if pct >= 90.0 {
-            UsageSeverity::Critical
-        } else if pct >= 70.0 {
-            UsageSeverity::Warning
-        } else {
-            UsageSeverity::Normal
-        }
-    }
-
-    fn combine(self, other: UsageSeverity) -> UsageSeverity {
-        if (self as u8) >= (other as u8) {
-            self
-        } else {
-            other
-        }
-    }
-}
 
 /// A single usage reading.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -271,12 +234,6 @@ impl ClaudeUsageModel {
             },
         );
     }
-}
-
-/// Elapsed wall-clock time between two instants, saturating at zero so a clock
-/// adjustment can't make a reading look like it came from the future.
-fn age(taken_at: SystemTime, now: SystemTime) -> Duration {
-    now.duration_since(taken_at).unwrap_or(Duration::ZERO)
 }
 
 /// The last reading, as persisted between launches.

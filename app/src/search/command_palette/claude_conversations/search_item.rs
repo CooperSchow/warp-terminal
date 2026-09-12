@@ -85,7 +85,7 @@ impl crate::search::item::SearchItem for ClaudeSessionItem {
     }
 
     fn accept_result(&self) -> Self::Action {
-        CommandPaletteItemAction::OpenClaudeSession {
+        CommandPaletteItemAction::OpenAgentSession {
             cwd: self.session.cwd.clone().unwrap_or_default(),
             resume_command: self.session.resume_command(),
         }

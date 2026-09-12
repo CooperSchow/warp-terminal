@@ -1,4 +1,5 @@
 pub mod claude_conversations;
+pub mod codex_conversations;
 pub mod conversations;
 mod data_sources;
 mod files;

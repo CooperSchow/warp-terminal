@@ -488,6 +488,9 @@ async_find = []
 changelog = []
 claude_conversations = []
 claude_usage = []
+codex_conversations = []
+codex_session_resume = []
+codex_usage = []
 clear_autosuggestion_on_escape = []
 cloud_object_initial_load = ["enforce_revisions_to_cloud_objects"]
 codebase_index_speedbump = []
@@ -689,6 +692,12 @@ default = [
     # remember to pass the feature flags.
     "claude_conversations",
     "claude_usage",
+    # Eqho fork: the same three capabilities for the Codex CLI — a second usage
+    # pill, a session browser, and resuming a pane's conversation on restore.
+    # On by default for the same reason.
+    "codex_usage",
+    "codex_conversations",
+    "codex_session_resume",
     # Eqho fork: tab marks. Stars are upstream's pinned tabs wearing a star, so
     # pinned_tabs ships with starred_tabs; Mark as Unread shares their menu
     # section and their pane_marks table.

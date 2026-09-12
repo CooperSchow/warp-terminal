@@ -127,6 +127,11 @@ impl ZeroState {
             valid_filters.push(QueryFilter::ClaudeConversations);
         }
 
+        // The same for past Codex CLI sessions.
+        if crate::settings::CodexSettings::as_ref(app).is_codex_conversations_enabled() {
+            valid_filters.push(QueryFilter::CodexConversations);
+        }
+
         valid_filters.into_iter()
     }
 }

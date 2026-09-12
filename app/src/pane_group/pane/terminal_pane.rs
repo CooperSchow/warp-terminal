@@ -534,6 +534,7 @@ impl PaneContent for TerminalPane {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: AgentNotificationsModel::unread_for_snapshot(
                     self.terminal_view(app).id(),
                     app,
@@ -569,6 +570,7 @@ impl PaneContent for TerminalPane {
                     conversation_ids_to_restore: vec![],
                     active_conversation_id: None,
                     claude_session_id: None,
+                    codex_session_id: None,
                     marked_unread: AgentNotificationsModel::unread_for_snapshot(
                         self.terminal_view(app).id(),
                         app,
@@ -633,6 +635,32 @@ impl PaneContent for TerminalPane {
                 );
             }
 
+            // The same for a pane running the Codex CLI, with one difference
+            // that matters. Claude has a `--continue` form meaning "the most
+            // recent conversation in this directory", so a Claude tab with no
+            // exact id still has a sensible fallback command. `codex resume`
+            // has no directory-scoped equivalent — `--last` is global — so a
+            // Codex tab stores a sentinel and restore resolves a concrete
+            // conversation from the pane's working directory instead.
+            let codex_session_id = crate::settings::codex_session_resume_enabled(app)
+                .then(|| {
+                    CLIAgentSessionsModel::as_ref(app)
+                        .session(tv_id)
+                        .filter(|session| matches!(session.agent, CLIAgent::Codex))
+                        .map(|session| {
+                            session.codex_resume_id().unwrap_or_else(|| {
+                                crate::terminal::cli_agent_sessions::history::codex::CODEX_RESUME_SENTINEL
+                                    .to_string()
+                            })
+                        })
+                })
+                .flatten();
+            if codex_session_id.is_some() {
+                log::info!(
+                    "[codex restore] captured codex tab: id={codex_session_id:?} cwd={pane_cwd:?}",
+                );
+            }
+
             LeafContents::Terminal(TerminalPaneSnapshot {
                 uuid: self.uuid.clone(),
                 cwd: pane_cwd,
@@ -645,6 +673,7 @@ impl PaneContent for TerminalPane {
                 conversation_ids_to_restore,
                 active_conversation_id,
                 claude_session_id,
+                codex_session_id,
                 marked_unread: AgentNotificationsModel::unread_for_snapshot(tv_id, app),
             })
         }

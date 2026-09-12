@@ -429,6 +429,9 @@ pub struct TerminalPane {
     /// The Claude Code session UUID that was running in this pane (if any), so it
     /// can be resumed with `claude --resume <id>` when the tab is restored.
     pub claude_session_id: Option<String>,
+    /// The Codex CLI conversation UUID that was running in this pane (if any),
+    /// so it can be resumed with `codex resume <id>` when the tab is restored.
+    pub codex_session_id: Option<String>,
 }
 
 #[derive(Identifiable, Queryable, Selectable)]
@@ -610,6 +613,9 @@ pub struct NewTerminalPane {
     /// The Claude Code session UUID that was running in this pane (if any), so it
     /// can be resumed with `claude --resume <id>` when the tab is restored.
     pub claude_session_id: Option<String>,
+    /// The Codex CLI conversation UUID that was running in this pane (if any),
+    /// so it can be resumed with `codex resume <id>` when the tab is restored.
+    pub codex_session_id: Option<String>,
 }
 
 /// A terminal pane's marks, keyed by `terminal_panes.uuid`. They live in a

@@ -65,19 +65,20 @@ use crate::settings::native_preference::{NativePreferenceSettings, UserNativePre
 use crate::settings::{
     AISettingsChangedEvent, AliasExpansionEnabled, AliasExpansionSettings, AppEditorSettings,
     AtContextMenuInTerminalMode, AutocompleteSymbols, AutosuggestionKeybindingHint,
-    ChangelogSettings, CloudPreferencesSettings, CodeEditorLineNumberMode,
-    CodeEditorLineNumberModeSetting, CodeSettings, CommandCorrections, CompletionsOpenWhileTyping,
-    CopyOnSelect, CtrlTabBehavior, DefaultSessionMode, EnableSlashCommandsInTerminal,
-    ErrorUnderliningEnabled, ExtraMetaKeys, GPUSettings, GlobalHotkeyMode, InputSettings,
-    InputSettingsChangedEvent, LinuxSelectionClipboard, MiddleClickPasteEnabled,
-    MouseScrollMultiplier, OutlineCodebaseSymbolsForAtContextMenu, PreferLowPowerGPU,
-    PreferredGraphicsBackend, QuakeModeSettings, ScrollSettings, ScrollSettingsChangedEvent,
-    SelectionSettings, ShowAutosuggestionIgnoreButton, ShowChangelogAfterUpdate,
-    ShowTerminalInputMessageBar, SshSettings, SyntaxHighlighting, TabBehavior,
-    UserNativeRedirectPreference, VimModeEnabled, VimStatusBar, VimUnnamedSystemClipboard,
-    DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES, QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
+    ChangelogSettings, ClaudeConversationsEnabled, ClaudeSettings, ClaudeUsagePillEnabled,
+    CloudPreferencesSettings, CodeEditorLineNumberMode, CodeEditorLineNumberModeSetting,
+    CodeSettings, CodexConversationsEnabled, CodexSessionResumeEnabled, CodexSettings,
+    CodexUsagePillEnabled, CommandCorrections, CompletionsOpenWhileTyping, CopyOnSelect,
+    CtrlTabBehavior, DefaultSessionMode, EnableSlashCommandsInTerminal, ErrorUnderliningEnabled,
+    ExtraMetaKeys, GPUSettings, GlobalHotkeyMode, InputSettings, InputSettingsChangedEvent,
+    LinuxSelectionClipboard, MiddleClickPasteEnabled, MouseScrollMultiplier,
+    OutlineCodebaseSymbolsForAtContextMenu, PreferLowPowerGPU, PreferredGraphicsBackend,
+    QuakeModeSettings, ScrollSettings, ScrollSettingsChangedEvent, SelectionSettings,
+    ShowAutosuggestionIgnoreButton, ShowChangelogAfterUpdate, ShowTerminalInputMessageBar,
+    SshSettings, SyntaxHighlighting, TabBehavior, UserNativeRedirectPreference, VimModeEnabled,
+    VimStatusBar, VimUnnamedSystemClipboard, DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES,
+    QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
 };
-use crate::settings::{ClaudeConversationsEnabled, ClaudeSettings, ClaudeUsagePillEnabled};
 use crate::terminal::alt_screen_reporting::{
     AltScreenReporting, FocusReportingEnabled, MouseReportingEnabled, ScrollReportingEnabled,
 };
@@ -731,6 +732,9 @@ pub enum FeaturesPageAction {
     ToggleAsyncFind,
     ToggleClaudeConversations,
     ToggleClaudeUsagePill,
+    ToggleCodexConversations,
+    ToggleCodexUsagePill,
+    ToggleCodexSessionResume,
     ToggleNotifications,
     ToggleRestoreSession,
     ToggleAutocompleteSymbols,
@@ -1352,6 +1356,18 @@ impl FeaturesPageAction {
             Self::ToggleClaudeUsagePill => TelemetryEvent::FeaturesPageAction {
                 action: "ToggleClaudeUsagePill".to_string(),
                 value: to_string(*ClaudeSettings::as_ref(ctx).claude_usage_pill_enabled),
+            },
+            Self::ToggleCodexConversations => TelemetryEvent::FeaturesPageAction {
+                action: "ToggleCodexConversations".to_string(),
+                value: to_string(*CodexSettings::as_ref(ctx).codex_conversations_enabled),
+            },
+            Self::ToggleCodexUsagePill => TelemetryEvent::FeaturesPageAction {
+                action: "ToggleCodexUsagePill".to_string(),
+                value: to_string(*CodexSettings::as_ref(ctx).codex_usage_pill_enabled),
+            },
+            Self::ToggleCodexSessionResume => TelemetryEvent::FeaturesPageAction {
+                action: "ToggleCodexSessionResume".to_string(),
+                value: to_string(*CodexSettings::as_ref(ctx).codex_session_resume_enabled),
             },
         }
     }
@@ -2145,6 +2161,21 @@ impl TypedActionView for FeaturesPageView {
                     report_if_error!(s.claude_usage_pill_enabled.toggle_and_save_value(ctx));
                 });
             }
+            ToggleCodexConversations => {
+                CodexSettings::handle(ctx).update(ctx, |s, ctx| {
+                    report_if_error!(s.codex_conversations_enabled.toggle_and_save_value(ctx));
+                });
+            }
+            ToggleCodexUsagePill => {
+                CodexSettings::handle(ctx).update(ctx, |s, ctx| {
+                    report_if_error!(s.codex_usage_pill_enabled.toggle_and_save_value(ctx));
+                });
+            }
+            ToggleCodexSessionResume => {
+                CodexSettings::handle(ctx).update(ctx, |s, ctx| {
+                    report_if_error!(s.codex_session_resume_enabled.toggle_and_save_value(ctx));
+                });
+            }
         }
 
         send_telemetry_from_ctx!(action.telemetry_event(ctx), ctx);
@@ -2775,6 +2806,9 @@ impl FeaturesPageView {
         general_widgets.push(Box::new(AsyncFindWidget::default()));
         general_widgets.push(Box::new(ClaudeConversationsWidget::default()));
         general_widgets.push(Box::new(ClaudeUsagePillWidget::default()));
+        general_widgets.push(Box::new(CodexConversationsWidget::default()));
+        general_widgets.push(Box::new(CodexUsagePillWidget::default()));
+        general_widgets.push(Box::new(CodexSessionResumeWidget::default()));
 
         let app_editor_settings = AppEditorSettings::as_ref(ctx);
 
@@ -7858,6 +7892,192 @@ impl SettingsWidget for ClaudeUsagePillWidget {
             appearance,
             Some(
                 "Show your Claude 5-hour and weekly usage limits as a pill in the tab bar.".into(),
+            ),
+        )
+    }
+}
+
+#[derive(Default)]
+struct CodexConversationsWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for CodexConversationsWidget {
+    type View = FeaturesPageView;
+
+    fn search_terms(&self) -> &str {
+        "codex conversations sessions resume command palette history openai gpt"
+    }
+
+    fn should_render(&self, _app: &AppContext) -> bool {
+        FeatureFlag::CodexConversations.is_enabled()
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let ui_builder = appearance.ui_builder();
+
+        let label = render_body_item_label::<FeaturesPageAction>(
+            "Codex conversations".into(),
+            None,
+            None,
+            LocalOnlyIconState::for_setting(
+                CodexConversationsEnabled::storage_key(),
+                CodexConversationsEnabled::sync_to_cloud(),
+                &mut view
+                    .button_mouse_states
+                    .local_only_icon_tooltip_states
+                    .borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+        );
+
+        let switch = ui_builder
+            .switch(self.switch_state.clone())
+            .check(*CodexSettings::as_ref(app).codex_conversations_enabled)
+            .build()
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(FeaturesPageAction::ToggleCodexConversations);
+            })
+            .finish();
+
+        build_toggle_element(
+            label,
+            switch,
+            appearance,
+            Some(
+                "List past Codex CLI sessions in the command palette and reopen one with codex resume."
+                    .into(),
+            ),
+        )
+    }
+}
+
+#[derive(Default)]
+struct CodexUsagePillWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for CodexUsagePillWidget {
+    type View = FeaturesPageView;
+
+    fn search_terms(&self) -> &str {
+        "codex usage pill limits weekly tab bar openai gpt subscription"
+    }
+
+    fn should_render(&self, _app: &AppContext) -> bool {
+        FeatureFlag::CodexUsage.is_enabled()
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let ui_builder = appearance.ui_builder();
+
+        let label = render_body_item_label::<FeaturesPageAction>(
+            "Codex usage pill".into(),
+            None,
+            None,
+            LocalOnlyIconState::for_setting(
+                CodexUsagePillEnabled::storage_key(),
+                CodexUsagePillEnabled::sync_to_cloud(),
+                &mut view
+                    .button_mouse_states
+                    .local_only_icon_tooltip_states
+                    .borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+        );
+
+        let switch = ui_builder
+            .switch(self.switch_state.clone())
+            .check(*CodexSettings::as_ref(app).codex_usage_pill_enabled)
+            .build()
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(FeaturesPageAction::ToggleCodexUsagePill);
+            })
+            .finish();
+
+        build_toggle_element(
+            label,
+            switch,
+            appearance,
+            Some(
+                "Show your Codex subscription limits as a pill in the tab bar, beside the Claude one."
+                    .into(),
+            ),
+        )
+    }
+}
+
+#[derive(Default)]
+struct CodexSessionResumeWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for CodexSessionResumeWidget {
+    type View = FeaturesPageView;
+
+    fn search_terms(&self) -> &str {
+        "codex resume restore session tab reopen conversation openai gpt"
+    }
+
+    fn should_render(&self, _app: &AppContext) -> bool {
+        FeatureFlag::CodexSessionResume.is_enabled()
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let ui_builder = appearance.ui_builder();
+
+        let label = render_body_item_label::<FeaturesPageAction>(
+            "Resume Codex sessions on restore".into(),
+            None,
+            None,
+            LocalOnlyIconState::for_setting(
+                CodexSessionResumeEnabled::storage_key(),
+                CodexSessionResumeEnabled::sync_to_cloud(),
+                &mut view
+                    .button_mouse_states
+                    .local_only_icon_tooltip_states
+                    .borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+        );
+
+        let switch = ui_builder
+            .switch(self.switch_state.clone())
+            .check(*CodexSettings::as_ref(app).codex_session_resume_enabled)
+            .build()
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(FeaturesPageAction::ToggleCodexSessionResume);
+            })
+            .finish();
+
+        build_toggle_element(
+            label,
+            switch,
+            appearance,
+            Some(
+                "When a window is restored, reopen each tab's Codex conversation instead of a blank shell."
+                    .into(),
             ),
         )
     }

@@ -6,7 +6,7 @@ use warp_core::features::FeatureFlag;
 use warpui::keymap::BindingId;
 use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
-use super::{claude_conversations, conversations, warp_drive};
+use super::{claude_conversations, codex_conversations, conversations, warp_drive};
 use crate::drive::settings::WarpDriveSettings;
 use crate::search::action::CommandBindingDataSource;
 use crate::search::binding_source::BindingSource;
@@ -30,6 +30,7 @@ pub struct DataSourceStore {
     new_session_data_source: Option<ModelHandle<NewSessionDataSource>>,
     all_conversation_data_source: ModelHandle<conversations::DataSource>,
     claude_conversations_data_source: ModelHandle<claude_conversations::DataSource>,
+    codex_conversations_data_source: ModelHandle<codex_conversations::DataSource>,
     repo_data_source: ModelHandle<RepoDataSource>,
     tabs_data_source: Option<ModelHandle<tabs::DataSource>>,
 }
@@ -59,6 +60,8 @@ impl DataSourceStore {
 
         let claude_conversations_data_source = ctx.add_model(claude_conversations::DataSource::new);
 
+        let codex_conversations_data_source = ctx.add_model(codex_conversations::DataSource::new);
+
         let repo_data_source = ctx.add_model(|_| RepoDataSource::new());
 
         Self {
@@ -69,6 +72,7 @@ impl DataSourceStore {
             new_session_data_source,
             all_conversation_data_source,
             claude_conversations_data_source,
+            codex_conversations_data_source,
             repo_data_source,
             tabs_data_source: None,
         }
@@ -162,6 +166,16 @@ impl DataSourceStore {
                 mixer.add_sync_source(
                     self.claude_conversations_data_source.clone(),
                     HashSet::from([QueryFilter::ClaudeConversations]),
+                );
+            }
+
+            // The same for past Codex CLI sessions (`codex resume <id>`).
+            if ctx.has_singleton_model::<crate::settings::CodexSettings>()
+                && crate::settings::CodexSettings::as_ref(ctx).is_codex_conversations_enabled()
+            {
+                mixer.add_sync_source(
+                    self.codex_conversations_data_source.clone(),
+                    HashSet::from([QueryFilter::CodexConversations]),
                 );
             }
 

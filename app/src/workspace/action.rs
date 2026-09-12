@@ -587,9 +587,11 @@ pub enum WorkspaceAction {
     StartNewConversation {
         terminal_view_id: EntityId,
     },
-    /// Reopen a past Claude Code session in a new tab by running `claude --resume <id>`
-    /// in the session's working directory.
-    OpenClaudeSessionTab {
+    /// Reopen a past CLI-agent session in a new tab by running its own resume
+    /// command (`claude --resume <id>`, `codex resume <id>`) in the session's
+    /// working directory. The command is supplied by the palette item, so this
+    /// stays agnostic about which agent it is reopening.
+    OpenAgentSessionTab {
         cwd: String,
         resume_command: String,
     },
@@ -1189,7 +1191,7 @@ impl WorkspaceAction {
             | ClearTabMultiSelection
             | CancelActiveRename
             | StartNewConversation { .. }
-            | OpenClaudeSessionTab { .. }
+            | OpenAgentSessionTab { .. }
             | UndoRevertInCodeReviewPane { .. }
             | JumpToLatestToast
             | NavigatePrevPaneOrPanel

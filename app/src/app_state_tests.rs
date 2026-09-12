@@ -73,6 +73,7 @@ fn terminal_leaf_walkers_visit_only_terminal_leaves_in_tree_order() {
             conversation_ids_to_restore: vec![],
             active_conversation_id: None,
             claude_session_id: None,
+            codex_session_id: None,
             marked_unread: false,
         })
     };

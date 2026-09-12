@@ -178,6 +178,8 @@ pub enum QueryFilter {
 
     /// Filter results for past Claude Code sessions (reopen via `claude --resume`).
     ClaudeConversations,
+    /// Filter results for past Codex CLI sessions (reopen via `codex resume`).
+    CodexConversations,
 
     /// Filter results for launch configurations.
     LaunchConfigurations,
@@ -248,6 +250,7 @@ impl QueryFilter {
             QueryFilter::Tabs => "Search tabs",
             QueryFilter::Conversations => "Search conversations",
             QueryFilter::ClaudeConversations => "Search Claude sessions",
+            QueryFilter::CodexConversations => "Search Codex sessions",
             QueryFilter::LaunchConfigurations => "Search launch configurations",
             QueryFilter::Drive => "Search objects in drive",
             QueryFilter::EnvironmentVariables => "Search environment variables",
@@ -282,7 +285,7 @@ impl QueryFilter {
             QueryFilter::Sessions => &SESSIONS_FILTER_ATOM,
             QueryFilter::Tabs => &NO_FILTER_ATOM,
             QueryFilter::Conversations => &CONVERSATIONS_FILTER_ATOM,
-            QueryFilter::ClaudeConversations => &NO_FILTER_ATOM,
+            QueryFilter::ClaudeConversations | QueryFilter::CodexConversations => &NO_FILTER_ATOM,
             QueryFilter::LaunchConfigurations => &LAUNCH_CONFIG_FILTER_ATOM,
             QueryFilter::Drive => &DRIVE_FILTER_ATOM,
             QueryFilter::EnvironmentVariables => &ENV_VARS_FILTER_ATOM,
@@ -316,6 +319,7 @@ impl QueryFilter {
             QueryFilter::Tabs => "tabs",
             QueryFilter::Conversations => "conversations",
             QueryFilter::ClaudeConversations => "Claude conversations",
+            QueryFilter::CodexConversations => "Codex conversations",
             QueryFilter::LaunchConfigurations => "launch configurations",
             QueryFilter::Drive => "Warp Drive",
             QueryFilter::EnvironmentVariables => "environment variables",
@@ -353,7 +357,9 @@ impl QueryFilter {
             QueryFilter::Sessions => Some("bundled/svg/terminal-input.svg"),
             QueryFilter::Tabs => Some("bundled/svg/terminal-input.svg"),
             QueryFilter::Conversations => Some("bundled/svg/conversation.svg"),
-            QueryFilter::ClaudeConversations => Some("bundled/svg/clock-rewind.svg"),
+            QueryFilter::ClaudeConversations | QueryFilter::CodexConversations => {
+                Some("bundled/svg/clock-rewind.svg")
+            }
             QueryFilter::LaunchConfigurations => Some("bundled/svg/navigation.svg"),
             QueryFilter::Drive => Some("bundled/svg/warp-drive.svg"),
             QueryFilter::EnvironmentVariables => Some("bundled/svg/env-var-collection.svg"),

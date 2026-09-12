@@ -1,5 +1,6 @@
 #![allow(clippy::doc_lazy_continuation)]
 
+mod agent_usage;
 mod ai;
 mod alloc;
 mod antivirus;
@@ -17,6 +18,7 @@ mod claude_usage;
 mod cloud_object;
 mod code;
 mod code_review;
+mod codex_usage;
 mod coding_entrypoints;
 mod coding_panel_enablement_state;
 mod command_palette;
@@ -1933,6 +1935,11 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| NetworkStatus::new());
     ctx.add_singleton_model(|ctx| {
         let mut model = claude_usage::ClaudeUsageModel::new();
+        model.start_polling(ctx);
+        model
+    });
+    ctx.add_singleton_model(|ctx| {
+        let mut model = codex_usage::CodexUsageModel::new();
         model.start_polling(ctx);
         model
     });

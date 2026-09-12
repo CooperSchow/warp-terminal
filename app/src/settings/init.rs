@@ -58,6 +58,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     BlockListSettings::register(ctx);
     BlockVisibilitySettings::register(ctx);
     crate::settings::ClaudeSettings::register(ctx);
+    crate::settings::CodexSettings::register(ctx);
     DebugSettings::register(ctx);
     SessionSettings::register(ctx);
     KeysSettings::register(ctx);

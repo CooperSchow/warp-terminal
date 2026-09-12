@@ -196,6 +196,23 @@ impl CLIAgentSession {
             .or_else(|| context.session_id.clone())
     }
 
+    /// The id to pass to `codex resume`, for a pane running the Codex CLI.
+    ///
+    /// Deliberately not [`Self::resume_id`]. That takes a transcript path's file
+    /// stem, which is exactly right for Claude — the stem *is* the session id —
+    /// and wrong for Codex, whose rollouts are named
+    /// `rollout-<timestamp>-<uuid>`. Handing that stem to `codex resume` would
+    /// look like a precise resume and fail every time.
+    pub fn codex_resume_id(&self) -> Option<String> {
+        let context = &self.session_context;
+        context
+            .transcript_path
+            .as_deref()
+            .map(std::path::Path::new)
+            .and_then(history::codex::session_id_from_path)
+            .or_else(|| context.session_id.clone())
+    }
+
     /// Applies an event to this session, updating context and status.
     /// Returns the new status if it changed, or `None` if the event was irrelevant.
     fn apply_event(&mut self, event: &CLIAgentEvent) -> Option<CLIAgentSessionStatus> {
@@ -369,9 +386,8 @@ impl CLIAgentSessionsModel {
             .and_then(|session| session.resume_id())
     }
 
-    /// Records that a restored tab is running a KNOWN Claude conversation, so the
-    /// next snapshot re-captures that exact id instead of decaying to the
-    /// `--continue` sentinel.
+    /// Records that a restored tab is running a KNOWN conversation, so the next
+    /// snapshot re-captures that exact id instead of decaying to a sentinel.
     ///
     /// This is what keeps each tab pinned to its own conversation across repeated
     /// quit/relaunch cycles: a restored `claude --resume <id>` process doesn't
@@ -379,9 +395,14 @@ impl CLIAgentSessionsModel {
     /// lost on the next quit and every tab would collapse onto `--continue` (the
     /// same, most-recent conversation). A live session that already carries a real
     /// session id from plugin events takes precedence and is left untouched.
-    pub fn register_restored_claude_session(
+    ///
+    /// The same decay applies to Codex, and worse: nothing in a restored Codex
+    /// process announces its conversation at all today, so without this every
+    /// Codex tab would fall back to a directory guess on every relaunch.
+    pub fn register_restored_agent_session(
         &mut self,
         terminal_view_id: EntityId,
+        agent: CLIAgent,
         session_id: String,
         cwd: Option<String>,
         ctx: &mut ModelContext<Self>,
@@ -396,7 +417,7 @@ impl CLIAgentSessionsModel {
         self.set_session(
             terminal_view_id,
             CLIAgentSession {
-                agent: CLIAgent::Claude,
+                agent,
                 status: CLIAgentSessionStatus::InProgress,
                 session_context: CLIAgentSessionContext {
                     session_id: Some(session_id),

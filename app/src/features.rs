@@ -519,6 +519,12 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::ClaudeConversations,
         #[cfg(feature = "claude_usage")]
         FeatureFlag::ClaudeUsage,
+        #[cfg(feature = "codex_usage")]
+        FeatureFlag::CodexUsage,
+        #[cfg(feature = "codex_conversations")]
+        FeatureFlag::CodexConversations,
+        #[cfg(feature = "codex_session_resume")]
+        FeatureFlag::CodexSessionResume,
     ]);
 
     flags

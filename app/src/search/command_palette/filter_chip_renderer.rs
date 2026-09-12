@@ -116,7 +116,8 @@ impl FilterChipRenderer for QueryFilter {
             | QueryFilter::BaseModels
             | QueryFilter::FullTerminalUseModels
             | QueryFilter::CurrentDirectoryConversations
-            | QueryFilter::ClaudeConversations => appearance
+            | QueryFilter::ClaudeConversations
+            | QueryFilter::CodexConversations => appearance
                 .theme()
                 .main_text_color(appearance.theme().surface_2())
                 .into_solid(),

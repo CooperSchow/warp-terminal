@@ -37,6 +37,7 @@ pub(super) struct WorkspaceMouseStates {
     pub(super) offline_icon: MouseStateHandle,
     pub(super) avatar_icon: MouseStateHandle,
     pub(super) usage_pill: MouseStateHandle,
+    pub(super) codex_usage_pill: MouseStateHandle,
     pub(super) header_dimming: MouseStateHandle,
     pub(super) right_panel_icon: MouseStateHandle,
     pub(super) notifications_mailbox: MouseStateHandle,

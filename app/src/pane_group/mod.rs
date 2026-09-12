@@ -1108,6 +1108,12 @@ thread_local! {
     /// (and share a cwd) don't get pinned to the *same* conversation.
     static RESTORE_ASSIGNED_CLAUDE_SESSIONS: std::cell::RefCell<std::collections::HashSet<String>> =
         std::cell::RefCell::new(std::collections::HashSet::new());
+
+    /// The same, for Codex conversations. A separate set because the two stores
+    /// mint ids independently, and one shared set would let a Claude id block a
+    /// Codex tab that happened to collide with it.
+    static RESTORE_ASSIGNED_CODEX_SESSIONS: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
 /// Picks the newest Claude conversation in `cwd` not yet handed to another restored
@@ -1117,6 +1123,22 @@ fn assign_distinct_claude_session(cwd: &str) -> Option<String> {
     RESTORE_ASSIGNED_CLAUDE_SESSIONS.with(|used| {
         let mut used = used.borrow_mut();
         crate::terminal::cli_agent_sessions::history::session_ids_for_cwd(cwd)
+            .into_iter()
+            .find(|id| used.insert(id.clone()))
+    })
+}
+
+/// The same for Codex: the newest conversation recorded in `cwd` that no other
+/// restored tab has taken this run.
+///
+/// This carries more weight than its Claude counterpart. `codex resume` has no
+/// directory-scoped "most recent" form to fall back on, so for a Codex tab
+/// whose exact id was lost this resolution *is* the feature — without it the
+/// tab comes back a blank shell.
+fn assign_distinct_codex_session(cwd: &str) -> Option<String> {
+    RESTORE_ASSIGNED_CODEX_SESSIONS.with(|used| {
+        let mut used = used.borrow_mut();
+        crate::terminal::cli_agent_sessions::history::codex::session_ids_for_cwd(cwd)
             .into_iter()
             .find(|id| used.insert(id.clone()))
     })
@@ -1740,6 +1762,7 @@ impl PaneGroup {
                         session_file_exists, CLAUDE_CONTINUE_SENTINEL,
                     };
                     use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
+                    use crate::terminal::CLIAgent;
 
                     // Resolve which conversation this tab should reopen:
                     //  - the exact captured id when its transcript is on disk, or
@@ -1772,13 +1795,81 @@ impl PaneGroup {
                         let cwd = terminal_snapshot.cwd.clone();
                         let reg_id = id.clone();
                         CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
-                            model.register_restored_claude_session(tv_id, reg_id, cwd, ctx);
+                            model.register_restored_agent_session(
+                                tv_id,
+                                CLIAgent::Claude,
+                                reg_id,
+                                cwd,
+                                ctx,
+                            );
                         });
                         format!("claude --resume {id}")
                     } else {
                         "claude --continue".to_string()
                     };
                     log::info!("[claude restore] restoring tab with: {command}");
+                    terminal_view.update(ctx, |terminal, ctx| {
+                        terminal.set_pending_command_queue(vec![command], ctx);
+                    });
+                }
+
+                // The same for a pane that was running the Codex CLI. A pane
+                // runs one agent, so at most one of these two branches fires.
+                //
+                // The fallback differs from Claude's. `codex resume` takes a
+                // conversation id and nothing else — there is no
+                // directory-scoped "most recent" form — so an exact id whose
+                // rollout is gone, or a sentinel, has to be turned into a
+                // concrete id by looking at the working directory. When that
+                // finds nothing the tab opens plain `codex`, which is still a
+                // working Codex tab rather than a blank shell.
+                if let Some(codex_id) = terminal_snapshot
+                    .codex_session_id
+                    .as_deref()
+                    .filter(|id| !id.is_empty())
+                {
+                    use crate::terminal::cli_agent_sessions::history::codex;
+                    use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
+                    use crate::terminal::CLIAgent;
+
+                    let resolved: Option<String> = if codex_id != codex::CODEX_RESUME_SENTINEL
+                        && codex::session_file_exists(codex_id)
+                    {
+                        // Reserve it so a sentinel tab's resolution can't hand
+                        // the same conversation to another tab.
+                        RESTORE_ASSIGNED_CODEX_SESSIONS
+                            .with(|used| used.borrow_mut().insert(codex_id.to_string()));
+                        Some(codex_id.to_string())
+                    } else {
+                        terminal_snapshot
+                            .cwd
+                            .as_deref()
+                            .and_then(assign_distinct_codex_session)
+                    };
+
+                    let command = match resolved {
+                        Some(id) => {
+                            // Register the resolved id now so the NEXT snapshot
+                            // re-captures it rather than decaying back to the
+                            // sentinel: a restored `codex resume` announces
+                            // nothing we could otherwise capture.
+                            let tv_id = terminal_view.id();
+                            let cwd = terminal_snapshot.cwd.clone();
+                            let reg_id = id.clone();
+                            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
+                                model.register_restored_agent_session(
+                                    tv_id,
+                                    CLIAgent::Codex,
+                                    reg_id,
+                                    cwd,
+                                    ctx,
+                                );
+                            });
+                            codex::resume_command_for(&id)
+                        }
+                        None => "codex".to_string(),
+                    };
+                    log::info!("[codex restore] restoring tab with: {command}");
                     terminal_view.update(ctx, |terminal, ctx| {
                         terminal.set_pending_command_queue(vec![command], ctx);
                     });
@@ -2257,6 +2348,7 @@ impl PaneGroup {
                             conversation_ids_to_restore: Vec::new(),
                             active_conversation_id: None,
                             claude_session_id: None,
+                            codex_session_id: None,
                             marked_unread: false,
                         })
                     }

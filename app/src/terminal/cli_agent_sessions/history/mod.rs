@@ -7,6 +7,12 @@
 //! [`ClaudeSession`] list so the UI can show past conversations and relaunch
 //! them in a new tab. It reads Claude's files directly (no new persistence),
 //! so it also surfaces sessions started before this feature existed.
+//!
+//! The Codex CLI's store is read by the sibling [`codex`] module. The two are
+//! kept apart on purpose: they share the `.jsonl` extension and nothing else —
+//! different directory layouts, different line schemas, different resume verbs.
+
+pub mod codex;
 
 use std::collections::BTreeSet;
 use std::env;

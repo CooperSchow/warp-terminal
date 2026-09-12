@@ -28,8 +28,9 @@ use crate::code::editor_management::CodeSource;
 use crate::notebooks::{CloudNotebook, CloudNotebookModel};
 use crate::persistence::model::{ObjectPermissions, PaneMark};
 use crate::persistence::pane_marks::take_mirror_warnings;
-use crate::persistence::schema;
-use crate::persistence::{BlockCompleted, ModelEvent, PersistedDataScope, PersistenceScope};
+use crate::persistence::{
+    schema, BlockCompleted, ModelEvent, PersistedDataScope, PersistenceScope,
+};
 use crate::server::ids::ClientId;
 use crate::tab::SelectedTabColor;
 use crate::terminal::model::block::SerializedBlock;
@@ -350,6 +351,7 @@ fn test_terminal_window_snapshot(vertical_tabs_panel_open: bool) -> WindowSnapsh
                     conversation_ids_to_restore: vec![],
                     active_conversation_id: None,
                     claude_session_id: None,
+                    codex_session_id: None,
                     marked_unread: false,
                 }),
             }),
@@ -440,6 +442,7 @@ fn test_sqlite_round_trips_custom_vertical_tabs_title() {
                         conversation_ids_to_restore: vec![],
                         active_conversation_id: None,
                         claude_session_id: None,
+                        codex_session_id: None,
                         marked_unread: false,
                     }),
                 }),
@@ -608,6 +611,7 @@ fn test_sqlite_round_trips_tab_groups() {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: false,
             }),
         }),
@@ -639,6 +643,7 @@ fn test_sqlite_round_trips_tab_groups() {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: false,
             }),
         }),
@@ -747,6 +752,7 @@ fn test_sqlite_round_trips_pinned_state() {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: false,
             }),
         }),
@@ -778,6 +784,7 @@ fn test_sqlite_round_trips_pinned_state() {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: false,
             }),
         }),
@@ -809,6 +816,7 @@ fn test_sqlite_round_trips_pinned_state() {
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
                 claude_session_id: None,
+                codex_session_id: None,
                 marked_unread: false,
             }),
         }),
@@ -1078,6 +1086,7 @@ fn marked_terminal(uuid: u8, marked_unread: bool) -> PaneNodeSnapshot {
             conversation_ids_to_restore: vec![],
             active_conversation_id: None,
             claude_session_id: None,
+            codex_session_id: None,
             marked_unread,
         }),
     })

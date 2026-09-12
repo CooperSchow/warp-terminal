@@ -273,6 +273,10 @@ pub struct TerminalPaneSnapshot {
     /// The Claude Code session UUID running in this pane at save time (if any),
     /// used to `claude --resume <id>` when the tab is restored on relaunch.
     pub claude_session_id: Option<String>,
+    /// The Codex CLI conversation UUID running in this pane at save time (if
+    /// any), used to `codex resume <id>` when the tab is restored on relaunch.
+    /// A pane runs one agent, so at most one of these two is ever set.
+    pub codex_session_id: Option<String>,
     /// Whether the pane showed the unread dot at save time, from a manual mark
     /// or an agent result nobody had looked at yet, so the dot survives a
     /// relaunch.

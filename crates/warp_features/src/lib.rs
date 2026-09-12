@@ -37,6 +37,18 @@ pub enum FeatureFlag {
     /// weekly limit percentages), backed by the `/api/oauth/usage` endpoint.
     ClaudeUsage,
 
+    /// Enables the always-visible Codex usage pill in the tab bar, backed by
+    /// `account/rateLimits/read` on the Codex CLI's bundled app server.
+    CodexUsage,
+
+    /// Enables the "Codex Conversations" command-palette provider that lists
+    /// past Codex CLI sessions and reopens one with `codex resume <id>`.
+    CodexConversations,
+
+    /// Enables resuming a pane's Codex CLI session when its tab is restored, so
+    /// a restored tab reopens its conversation instead of a blank shell.
+    CodexSessionResume,
+
     /// Does grid storage go forwards or backwards
     SequentialStorage,
 
@@ -1013,6 +1025,9 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::McpJsonTreeView,
     FeatureFlag::ClaudeConversations,
     FeatureFlag::ClaudeUsage,
+    FeatureFlag::CodexUsage,
+    FeatureFlag::CodexConversations,
+    FeatureFlag::CodexSessionResume,
     FeatureFlag::ClaudeAutoTabColors,
     FeatureFlag::StarredTabs,
     FeatureFlag::TabMarkUnread,

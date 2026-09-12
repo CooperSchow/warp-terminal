@@ -81,8 +81,9 @@ pub enum CommandPaletteItemAction {
     },
     /// Start a new AI conversation
     NewConversation,
-    /// Reopen a past Claude Code session (`claude --resume <id>`) in a new tab.
-    OpenClaudeSession {
+    /// Reopen a past CLI-agent session in a new tab, running the resume
+    /// command the palette item supplies.
+    OpenAgentSession {
         cwd: String,
         resume_command: String,
     },
@@ -151,7 +152,7 @@ impl CommandPaletteItemAction {
                 ItemSummary::Project { path: path.clone() }
             }
             CommandPaletteItemAction::NewConversation => ItemSummary::NewConversation,
-            CommandPaletteItemAction::OpenClaudeSession { .. } => ItemSummary::NoOp,
+            CommandPaletteItemAction::OpenAgentSession { .. } => ItemSummary::NoOp,
             CommandPaletteItemAction::NoOp => ItemSummary::NoOp,
         }
     }

@@ -993,11 +993,11 @@ impl View {
                     });
                 }
             }
-            CommandPaletteItemAction::OpenClaudeSession {
+            CommandPaletteItemAction::OpenAgentSession {
                 cwd,
                 resume_command,
             } => {
-                ctx.dispatch_typed_action(&WorkspaceAction::OpenClaudeSessionTab {
+                ctx.dispatch_typed_action(&WorkspaceAction::OpenAgentSessionTab {
                     cwd,
                     resume_command,
                 });
