@@ -49,34 +49,54 @@ const MAX_DISPLAY_AGE: Duration = Duration::from_secs(2 * 60 * 60);
 const CACHE_FILE: &str = "claude_usage_cache.json";
 
 /// A single usage reading.
+///
+/// Both windows are optional, independently: since 2026-10-30 the endpoint
+/// returns `"five_hour": null` for this account, and a parser that required it
+/// rejected every reading from then on. A window that isn't reported is left
+/// out of the pill rather than shown as 0%.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClaudeUsage {
-    pub five_hour_pct: f32,
-    pub weekly_pct: f32,
+    pub five_hour_pct: Option<f32>,
+    pub weekly_pct: Option<f32>,
     pub five_hour_resets_at: Option<String>,
     pub weekly_resets_at: Option<String>,
     pub severity: UsageSeverity,
 }
 
-/// Stands in for the figures until a reading lands. Same shape as a real label
-/// so the pill keeps its size when data arrives instead of jumping.
-pub const PLACEHOLDER_LABEL: &str = "5h — · wk —";
+/// Stands in for the figures until a reading lands. Same shape as the usual
+/// (weekly-only) label so the pill keeps its size when data arrives.
+pub const PLACEHOLDER_LABEL: &str = "wk —";
 
 impl ClaudeUsage {
-    /// Compact always-visible label, e.g. `5h 7% · wk 9%`.
+    /// Compact always-visible label, e.g. `5h 7% · wk 9%`, or just `wk 9%`
+    /// when the endpoint reports no 5-hour window.
     pub fn pill_label(&self) -> String {
-        format!("5h {:.0}% · wk {:.0}%", self.five_hour_pct, self.weekly_pct)
+        let parts: Vec<String> = [("5h", self.five_hour_pct), ("wk", self.weekly_pct)]
+            .into_iter()
+            .filter_map(|(name, pct)| pct.map(|pct| format!("{name} {pct:.0}%")))
+            .collect();
+        if parts.is_empty() {
+            return PLACEHOLDER_LABEL.to_string();
+        }
+        parts.join(" · ")
     }
 
     /// Multi-line detail shown on hover, including when each window resets.
     pub fn tooltip_text(&self) -> String {
-        format!(
-            "Claude usage\n5-hour limit: {:.0}%{}\nWeekly limit: {:.0}%{}",
-            self.five_hour_pct,
-            fmt_reset(&self.five_hour_resets_at),
-            self.weekly_pct,
-            fmt_reset(&self.weekly_resets_at),
-        )
+        let mut lines = vec!["Claude usage".to_string()];
+        if let Some(pct) = self.five_hour_pct {
+            lines.push(format!(
+                "5-hour limit: {pct:.0}%{}",
+                fmt_reset(&self.five_hour_resets_at)
+            ));
+        }
+        if let Some(pct) = self.weekly_pct {
+            lines.push(format!(
+                "Weekly limit: {pct:.0}%{}",
+                fmt_reset(&self.weekly_resets_at)
+            ));
+        }
+        lines.join("\n")
     }
 }
 
@@ -399,17 +419,20 @@ fn api_error_kind(body: &[u8]) -> Option<String> {
 fn parse_usage(body: &[u8]) -> Option<ClaudeUsage> {
     let v: Value = serde_json::from_slice(body).ok()?;
 
-    // A valid usage payload has a `five_hour.utilization`; anything else
-    // (error page, `{"error": ...}`) yields no pill rather than a bogus 0%.
-    let five_hour_pct = v
-        .get("five_hour")
-        .and_then(|w| w.get("utilization"))
-        .and_then(Value::as_f64)? as f32;
-    let weekly_pct = v
-        .get("seven_day")
-        .and_then(|w| w.get("utilization"))
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0) as f32;
+    // A valid usage payload reports at least one window's `utilization`;
+    // anything else (error page, `{"error": ...}`) yields no reading rather
+    // than a bogus 0%. Neither window is required on its own.
+    let pct = |window: &str| {
+        v.get(window)
+            .and_then(|w| w.get("utilization"))
+            .and_then(Value::as_f64)
+            .map(|pct| pct as f32)
+    };
+    let five_hour_pct = pct("five_hour");
+    let weekly_pct = pct("seven_day");
+    if five_hour_pct.is_none() && weekly_pct.is_none() {
+        return None;
+    }
     let five_hour_resets_at = v["five_hour"]["resets_at"].as_str().map(str::to_owned);
     let weekly_resets_at = v["seven_day"]["resets_at"].as_str().map(str::to_owned);
 
@@ -428,7 +451,8 @@ fn parse_usage(body: &[u8]) -> Option<ClaudeUsage> {
         }
     }
     if !saw_tagged {
-        severity = UsageSeverity::from_pct(five_hour_pct.max(weekly_pct));
+        severity =
+            UsageSeverity::from_pct(five_hour_pct.unwrap_or(0.0).max(weekly_pct.unwrap_or(0.0)));
     }
 
     Some(ClaudeUsage {

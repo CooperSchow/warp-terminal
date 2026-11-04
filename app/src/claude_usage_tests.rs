@@ -8,8 +8,8 @@ fn parses_windows_and_resets() {
         "limits": [{"kind":"session","percent":7,"severity":"normal","is_active":false}]
     }"#;
     let u = parse_usage(body).expect("valid payload");
-    assert_eq!(u.five_hour_pct, 7.0);
-    assert_eq!(u.weekly_pct, 9.0);
+    assert_eq!(u.five_hour_pct, Some(7.0));
+    assert_eq!(u.weekly_pct, Some(9.0));
     assert_eq!(
         u.five_hour_resets_at.as_deref(),
         Some("2026-07-16T04:50:00Z")
@@ -51,7 +51,36 @@ fn falls_back_to_percentage_severity_when_untagged() {
 fn rejects_non_usage_payloads() {
     assert!(parse_usage(br#"{"error": "unauthorized"}"#).is_none());
     assert!(parse_usage(br#"not json"#).is_none());
-    assert!(parse_usage(br#"{"seven_day": {"utilization": 5.0}}"#).is_none()); // no five_hour
+    assert!(parse_usage(br#"{"five_hour": null, "seven_day": null}"#).is_none());
+    // no window at all
+}
+
+/// The live shape since 2026-10-30: no 5-hour window, weekly only.
+#[test]
+fn shows_weekly_alone_when_five_hour_is_null() {
+    let body = br#"{
+        "five_hour": null,
+        "seven_day": {"utilization": 44.0, "resets_at": "2026-11-09T05:00:00.090020+00:00"},
+        "limits": [
+            {"kind":"weekly_all","percent":44,"severity":"normal","is_active":true},
+            {"kind":"weekly_scoped","percent":0,"severity":"normal","is_active":false}
+        ]
+    }"#;
+    let u = parse_usage(body).expect("weekly-only payload is a valid reading");
+    assert_eq!(u.five_hour_pct, None);
+    assert_eq!(u.weekly_pct, Some(44.0));
+    assert_eq!(u.severity, UsageSeverity::Normal);
+    assert_eq!(u.pill_label(), "wk 44%");
+    assert_eq!(
+        u.tooltip_text(),
+        "Claude usage\nWeekly limit: 44% · resets 11-09 05:00 UTC"
+    );
+}
+
+#[test]
+fn untagged_weekly_only_reading_takes_severity_from_weekly() {
+    let body = br#"{"seven_day": {"utilization": 92.0}}"#;
+    assert_eq!(parse_usage(body).unwrap().severity, UsageSeverity::Critical);
 }
 
 /// The retain/expire policy behind the pill's figures. The pill itself is
@@ -66,8 +95,8 @@ mod poll_policy {
 
     fn reading(pct: f32) -> ClaudeUsage {
         ClaudeUsage {
-            five_hour_pct: pct,
-            weekly_pct: pct,
+            five_hour_pct: Some(pct),
+            weekly_pct: Some(pct),
             five_hour_resets_at: None,
             weekly_resets_at: None,
             severity: UsageSeverity::Normal,
@@ -91,7 +120,7 @@ mod poll_policy {
         model.record_poll(None, now + POLL_INTERVAL);
 
         assert_eq!(
-            model.usage().map(|u| u.five_hour_pct),
+            model.usage().and_then(|u| u.five_hour_pct),
             Some(7.0),
             "a transient failure must not blank figures the user is looking at"
         );
@@ -127,7 +156,7 @@ mod poll_policy {
 
         let delay = model.record_poll(Some(reading(11.0)), now + STALE_AFTER * 2);
 
-        assert_eq!(model.usage().map(|u| u.five_hour_pct), Some(11.0));
+        assert_eq!(model.usage().and_then(|u| u.five_hour_pct), Some(11.0));
         assert!(!model.is_stale(), "a fresh reading is trusted again");
         assert_eq!(delay, POLL_INTERVAL, "healthy again: back to the slow poll");
     }
@@ -211,7 +240,7 @@ mod poll_policy {
 
         let delay = model.record_poll(Some(reading(3.0)), now);
 
-        assert_eq!(model.usage().map(|u| u.five_hour_pct), Some(3.0));
+        assert_eq!(model.usage().and_then(|u| u.five_hour_pct), Some(3.0));
         assert!(!model.is_stale());
         assert_eq!(delay, POLL_INTERVAL);
     }
@@ -242,8 +271,8 @@ mod cache {
 
     fn reading() -> ClaudeUsage {
         ClaudeUsage {
-            five_hour_pct: 42.0,
-            weekly_pct: 13.5,
+            five_hour_pct: Some(42.0),
+            weekly_pct: Some(13.5),
             five_hour_resets_at: Some("2026-07-26T23:20:00Z".to_string()),
             weekly_resets_at: None,
             severity: UsageSeverity::Warning,
@@ -259,8 +288,8 @@ mod cache {
         save_cached_reading_to(&path, &reading(), taken_at);
         let (read, read_taken_at) = load_cached_reading_from(&path).expect("cached reading");
 
-        assert_eq!(read.five_hour_pct, 42.0);
-        assert_eq!(read.weekly_pct, 13.5);
+        assert_eq!(read.five_hour_pct, Some(42.0));
+        assert_eq!(read.weekly_pct, Some(13.5));
         assert_eq!(read.severity, UsageSeverity::Warning);
         assert_eq!(
             read.five_hour_resets_at.as_deref(),
@@ -305,7 +334,7 @@ mod cache {
         let model = ClaudeUsageModel::restoring(Some((reading(), taken_at)), now);
 
         assert_eq!(
-            model.usage().map(|u| u.five_hour_pct),
+            model.usage().and_then(|u| u.five_hour_pct),
             Some(42.0),
             "a relaunch should show real figures, not the placeholder"
         );
