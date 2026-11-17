@@ -5600,6 +5600,9 @@ impl Workspace {
         // disagreement between the two would look like an arrival. Every
         // report goes to the model, `None` and inactive windows included.
         let focused_for_marks = self.active_tab_focused_terminal_view_id(ctx);
+        if is_active_window {
+            crate::focused_session::report(focused_for_marks, ctx);
+        }
         let dwell = AgentNotificationsModel::handle(ctx).update(ctx, |model, ctx| {
             let dwell =
                 model.record_terminal_focus(window_id, focused_for_marks, is_active_window, ctx);

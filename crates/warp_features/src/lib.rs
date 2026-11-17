@@ -783,6 +783,10 @@ pub enum FeatureFlag {
     /// next unread tab.
     TabMarkUnread,
 
+    /// Writes the focused pane's Claude session id to
+    /// `~/.warp-oss/focused-session` whenever the focused pane changes.
+    FocusedSessionFile,
+
     /// Enables the new settings to control visibility of Warp Drive, Code Review Panel,
     /// and Project Explorer & Global Search features.
     OpenWarpNewSettingsModes,
@@ -1031,6 +1035,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ClaudeAutoTabColors,
     FeatureFlag::StarredTabs,
     FeatureFlag::TabMarkUnread,
+    FeatureFlag::FocusedSessionFile,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Warp).

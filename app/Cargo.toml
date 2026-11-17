@@ -704,6 +704,9 @@ default = [
     "pinned_tabs",
     "starred_tabs",
     "tab_mark_unread",
+    # Eqho fork: the focused pane's Claude session id in
+    # ~/.warp-oss/focused-session, for the Stream Deck plugin.
+    "focused_session_file",
     "git_credential_refresh",
     "oz_handoff",
     "handoff_local_cloud",
@@ -1021,6 +1024,7 @@ custom_tab_colors = []
 claude_auto_tab_colors = []
 starred_tabs = []
 tab_mark_unread = []
+focused_session_file = []
 open_warp_new_settings_modes = []
 hoa_code_review = []
 vertical_tabs = []

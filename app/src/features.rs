@@ -443,6 +443,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::StarredTabs,
         #[cfg(feature = "tab_mark_unread")]
         FeatureFlag::TabMarkUnread,
+        #[cfg(feature = "focused_session_file")]
+        FeatureFlag::FocusedSessionFile,
         #[cfg(feature = "open_warp_new_settings_modes")]
         FeatureFlag::OpenWarpNewSettingsModes,
         #[cfg(feature = "hoa_code_review")]
